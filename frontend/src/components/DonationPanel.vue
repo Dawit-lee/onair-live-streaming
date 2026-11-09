@@ -85,6 +85,7 @@ onUnmounted(() => clearInterval(timer))
     </template>
     <p v-else-if="!config.enabled" class="muted">결제 키가 설정되지 않아 후원이 비활성화되어 있습니다.</p>
     <p v-else-if="!auth.token" class="muted">로그인하면 후원할 수 있습니다.</p>
+    <p v-else class="muted">내 방송에는 후원할 수 없습니다. 다른 계정(예: 데모 시청자)으로 로그인해 후원해 보세요.</p>
     <p v-if="error" class="error">{{ error }}</p>
     <div v-for="d in summary.items.slice(0, 10)" :key="d.id" class="muted" style="margin-top: 6px">
       💚 <b style="color: var(--text)">{{ d.donorNickname }}</b> {{ fmtWon(d.amount) }} <span v-if="d.message">— {{ d.message }}</span>
