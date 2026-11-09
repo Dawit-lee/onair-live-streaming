@@ -37,6 +37,7 @@ public class SecurityConfig {
         "/api/broadcasts/*",
         "/api/broadcasts/*/comments",
         "/api/broadcasts/*/donations",
+        "/api/broadcasts/*/thumbnail",
         "/api/recordings",
         "/api/recordings/*",
         "/api/recordings/*/video",

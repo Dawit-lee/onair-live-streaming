@@ -2,10 +2,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Room, RoomEvent, Track } from 'livekit-client'
-import { api, fmtDate } from '../lib/api'
+import { api, fmtDate, fmtWon } from '../lib/api'
 import { auth } from '../lib/auth'
-import CommentPanel from '../components/CommentPanel.vue'
-import DonationPanel from '../components/DonationPanel.vue'
+import { avatarStyle, initial, fmtCount, fmtUptime, thumbUrl, timeAgo, useNow } from '../lib/ui'
+import ChatPanel from '../components/ChatPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,8 +17,13 @@ const audioBox = ref(null)
 const connected = ref(false)
 const hasVideo = ref(false)
 const needsAudioClick = ref(false)
+const alert = ref(null)
+const recording = ref(null)
+const now = useNow()
 let room = null
 let timer
+let alertQueue = []
+let alertTimer = null
 
 const isOwner = computed(() => b.value && auth.user?.id === b.value.ownerId)
 
@@ -32,6 +37,11 @@ async function refresh() {
   }
   if (b.value.status === 'LIVE' && !room) connect()
   if (b.value.status !== 'LIVE' && room) disconnect()
+  if (b.value.status === 'ENDED' && !recording.value) {
+    try {
+      recording.value = (await api('/recordings')).find((r) => r.broadcastId === b.value.id) || null
+    } catch {}
+  }
 }
 
 async function connect() {
@@ -83,8 +93,18 @@ function disconnect() {
   if (audioBox.value) audioBox.value.innerHTML = ''
 }
 
+/** 새 후원은 플레이어 위에 5초씩 순서대로 띄운다. */
+function onDonation(d) {
+  alertQueue.push(d)
+  if (!alertTimer) nextAlert()
+}
+function nextAlert() {
+  alert.value = alertQueue.shift() || null
+  alertTimer = alert.value ? setTimeout(nextAlert, 5000) : null
+}
+
 async function remove() {
-  if (!confirm('방송을 삭제할까요? 댓글, 후원 내역, 녹화도 함께 삭제됩니다.')) return
+  if (!confirm('방송을 삭제할까요? 채팅, 후원 내역, 녹화도 함께 삭제됩니다.')) return
   try {
     await api(`/broadcasts/${id}`, { method: 'DELETE' })
     router.replace('/')
@@ -99,45 +119,71 @@ onMounted(() => {
 })
 onUnmounted(() => {
   clearInterval(timer)
+  clearTimeout(alertTimer)
   disconnect()
 })
 </script>
 
 <template>
-  <p v-if="error" class="error">{{ error }}</p>
-  <div v-if="b" class="layout">
-    <div>
+  <p v-if="error && !b" class="error page">{{ error }}</p>
+  <div v-if="b" class="watch">
+    <div class="watch-main">
       <div class="player">
         <video ref="videoEl" autoplay playsinline />
-        <div v-if="b.status !== 'LIVE'" class="overlay">
-          <div>
-            <h2>{{ b.status === 'ENDED' ? '방송이 종료되었습니다' : '방송 시작 전입니다' }}</h2>
-            <RouterLink v-if="b.status === 'ENDED'" to="/recordings" class="muted">다시보기 목록 보기</RouterLink>
+        <template v-if="b.status !== 'LIVE'">
+          <img class="poster" :src="thumbUrl(b.id)" alt="" @error="(e) => (e.target.style.display = 'none')" />
+          <div class="overlay">
+            <div>
+              <h2>{{ b.status === 'ENDED' ? '방송이 종료되었습니다' : '방송 시작 전입니다' }}</h2>
+              <p class="muted">{{ b.status === 'ENDED' ? `${timeAgo(b.endedAt)} 종료` : '방송이 시작되면 자동으로 재생됩니다.' }}</p>
+              <RouterLink v-if="recording" :to="`/recordings/${recording.id}`" class="btn primary" style="margin-top: 8px">▶ 다시보기</RouterLink>
+            </div>
           </div>
-        </div>
+        </template>
         <div v-else-if="!hasVideo" class="overlay"><span class="muted">방송 화면을 불러오는 중…</span></div>
         <div v-else-if="needsAudioClick" class="overlay" style="background: rgba(0, 0, 0, 0.3)">
-          <button class="primary" @click="startAudio">🔊 소리 켜기</button>
+          <button class="primary lg" @click="startAudio">🔊 소리 켜기</button>
+        </div>
+        <div v-if="b.status === 'LIVE'" class="hud">
+          <span class="badge-live">LIVE</span>
+          <span class="badge">👤 {{ fmtCount(b.viewerCount) }}</span>
+          <span class="badge">{{ fmtUptime(b.startedAt, now) }}</span>
+        </div>
+        <div v-if="alert" :key="alert.id" class="alert" role="status">
+          <div><b>{{ alert.donorNickname }}</b>님이</div>
+          <div class="amt">{{ fmtWon(alert.amount) }} 후원!</div>
+          <div v-if="alert.message" class="msg">{{ alert.message }}</div>
         </div>
       </div>
       <div ref="audioBox" style="display: none" />
-      <div class="row" style="margin-top: 8px">
-        <span class="badge" :class="b.status">{{ b.status === 'LIVE' ? 'LIVE' : b.status === 'READY' ? '방송 전' : '종료' }}</span>
-        <span v-if="connected" class="muted"><span class="dot" /> 실시간 시청 중</span>
-        <span class="muted">{{ b.sourceType === 'CAMERA' ? '📱 모바일 카메라 방송' : b.sourceType === 'SCREEN' ? '🖥️ PC 화면 방송' : '' }}</span>
-      </div>
-      <h1>{{ b.title }}</h1>
-      <div class="muted">{{ b.ownerNickname }} · {{ b.category || '일반' }} · 등록 {{ fmtDate(b.createdAt) }}</div>
-      <p v-if="b.description" style="white-space: pre-wrap">{{ b.description }}</p>
-      <div v-if="isOwner" class="row" style="margin-top: 12px">
-        <RouterLink :to="`/studio/${b.id}`" class="btn primary">스튜디오 (송출 제어)</RouterLink>
-        <RouterLink :to="`/broadcasts/${b.id}/edit`" class="btn">정보 수정</RouterLink>
-        <button class="danger" @click="remove">삭제</button>
+
+      <div class="watch-info">
+        <h1 class="title">{{ b.title }}</h1>
+        <div class="channel-row">
+          <div class="avatar lg" :class="{ live: b.status === 'LIVE' }" :style="avatarStyle(b.ownerId)">{{ initial(b.ownerNickname) }}</div>
+          <div class="who">
+            <div class="nick">{{ b.ownerNickname }}</div>
+            <div class="stats">
+              <span class="tag">{{ b.category || '일반' }}</span>
+              <span>{{ b.sourceType === 'CAMERA' ? '📱 모바일 카메라 방송' : b.sourceType === 'SCREEN' ? '🖥️ PC 화면 방송' : '' }}</span>
+              <template v-if="b.status === 'LIVE'">
+                <span class="on">● {{ fmtCount(b.viewerCount) }}명 시청 중</span>
+                <span>{{ fmtUptime(b.startedAt, now) }} 스트리밍 중</span>
+              </template>
+              <span v-else-if="b.status === 'ENDED'">{{ fmtDate(b.endedAt) }} 종료</span>
+              <span v-else>방송 예정</span>
+            </div>
+          </div>
+          <div v-if="isOwner" class="row">
+            <RouterLink :to="`/studio/${b.id}`" class="btn primary">🎙️ 스튜디오</RouterLink>
+            <RouterLink :to="`/broadcasts/${b.id}/edit`" class="btn">정보 수정</RouterLink>
+            <button class="ghost" @click="remove">삭제</button>
+          </div>
+        </div>
+        <p v-if="error" class="error">{{ error }}</p>
+        <div v-if="b.description" class="desc">{{ b.description }}</div>
       </div>
     </div>
-    <div class="side">
-      <CommentPanel :broadcast-id="b.id" />
-      <DonationPanel :broadcast="b" />
-    </div>
+    <ChatPanel :broadcast="b" @donation="onDonation" />
   </div>
 </template>

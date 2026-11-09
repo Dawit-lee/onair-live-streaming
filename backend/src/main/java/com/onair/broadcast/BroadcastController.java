@@ -7,7 +7,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.nio.file.Files;
+
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -72,5 +79,21 @@ public class BroadcastController {
     @PostMapping("/{id}/viewer-token")
     public BroadcastService.Connection viewerToken(@PathVariable long id) {
         return service.viewerToken(id);
+    }
+
+    @PostMapping(value = "/{id}/thumbnail", consumes = MediaType.ALL_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void uploadThumbnail(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, @RequestBody byte[] jpeg) {
+        service.saveThumbnail(AuthUser.id(jwt), id, jpeg);
+    }
+
+    @GetMapping("/{id}/thumbnail")
+    public ResponseEntity<Resource> thumbnail(@PathVariable long id) {
+        var file = service.thumbnail(id);
+        if (!Files.exists(file)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .cacheControl(CacheControl.noCache())
+                .body(new FileSystemResource(file));
     }
 }

@@ -1,7 +1,13 @@
 package com.onair.broadcast;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +23,23 @@ public class BroadcastService {
     private final UserRepository users;
     private final LiveKitService liveKit;
     private final RecordingService recordings;
+    private final Path thumbnailDir;
 
     public BroadcastService(
-            BroadcastRepository broadcasts, UserRepository users, LiveKitService liveKit, RecordingService recordings) {
+            BroadcastRepository broadcasts,
+            UserRepository users,
+            LiveKitService liveKit,
+            RecordingService recordings,
+            @Value("${app.recording.dir:./data/recordings}") String recordingDir) {
         this.broadcasts = broadcasts;
         this.users = users;
         this.liveKit = liveKit;
         this.recordings = recordings;
+        // 녹화 볼륨 안에 둬서 컨테이너를 다시 만들어도 유지된다.
+        this.thumbnailDir = Path.of(recordingDir, "thumbnails").toAbsolutePath().normalize();
     }
+
+    static final int MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024;
 
     public record Connection(String livekitUrl, String token, String roomName) {}
 
@@ -37,13 +52,38 @@ public class BroadcastService {
         // 방송 중인 것을 먼저 보여준다 (stable sort라 같은 상태 안에서는 최신순 유지).
         return found.stream()
                 .sorted((a, b) -> Boolean.compare(b.getStatus() == BroadcastStatus.LIVE, a.getStatus() == BroadcastStatus.LIVE))
-                .map(BroadcastResponse::of)
+                .map(this::withViewers)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public BroadcastResponse get(long id) {
-        return BroadcastResponse.of(find(id));
+        return withViewers(find(id));
+    }
+
+    private BroadcastResponse withViewers(Broadcast b) {
+        int viewers = b.getStatus() == BroadcastStatus.LIVE ? liveKit.viewerCount(b.getRoomName()) : 0;
+        return BroadcastResponse.of(b, viewers);
+    }
+
+    /** 송출 화면에서 주기적으로 올리는 라이브 썸네일(JPEG). 소유자만 올릴 수 있다. */
+    @Transactional(readOnly = true)
+    public void saveThumbnail(long userId, long id, byte[] jpeg) {
+        findOwned(userId, id);
+        boolean isJpeg = jpeg.length > 3 && (jpeg[0] & 0xFF) == 0xFF && (jpeg[1] & 0xFF) == 0xD8;
+        if (!isJpeg || jpeg.length > MAX_THUMBNAIL_BYTES) throw ApiException.badRequest("JPEG 이미지(2MB 이하)만 올릴 수 있습니다.");
+        try {
+            Files.createDirectories(thumbnailDir);
+            Path tmp = thumbnailDir.resolve(id + ".jpg.tmp");
+            Files.write(tmp, jpeg);
+            Files.move(tmp, thumbnail(id), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public Path thumbnail(long id) {
+        return thumbnailDir.resolve(id + ".jpg");
     }
 
     @Transactional
@@ -66,6 +106,11 @@ public class BroadcastService {
             liveKit.deleteRoom(b.getRoomName());
         }
         recordings.deleteFiles(id);
+        try {
+            Files.deleteIfExists(thumbnail(id));
+        } catch (IOException ignored) {
+            // 썸네일 정리 실패는 삭제를 막지 않는다.
+        }
         broadcasts.delete(b);
     }
 

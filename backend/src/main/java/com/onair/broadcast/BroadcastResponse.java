@@ -14,8 +14,13 @@ public record BroadcastResponse(
         Instant startedAt,
         Instant endedAt,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        int viewerCount) {
     static BroadcastResponse of(Broadcast b) {
+        return of(b, 0);
+    }
+
+    static BroadcastResponse of(Broadcast b, int viewerCount) {
         return new BroadcastResponse(
                 b.getId(),
                 b.getTitle(),
@@ -28,6 +33,7 @@ public record BroadcastResponse(
                 b.getStartedAt(),
                 b.getEndedAt(),
                 b.getCreatedAt(),
-                b.getUpdatedAt());
+                b.getUpdatedAt(),
+                viewerCount);
     }
 }

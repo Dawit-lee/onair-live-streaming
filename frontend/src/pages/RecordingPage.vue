@@ -29,12 +29,13 @@ async function remove() {
 </script>
 
 <template>
+  <div class="page" style="max-width: 1200px">
   <p v-if="error" class="error">{{ error }}</p>
   <div v-if="r">
-    <div class="player">
-      <video :src="r.videoUrl" controls playsinline />
+    <div class="vod-player">
+      <video :src="r.videoUrl" controls playsinline autoplay />
     </div>
-    <h1>{{ r.title }}</h1>
+    <h1 style="margin-top: 16px">{{ r.title }}</h1>
     <div class="muted">
       {{ r.ownerNickname }} · 녹화 {{ fmtDate(r.startedAt) }} ~ {{ fmtDate(r.endedAt) }} · {{ (r.sizeBytes / 1048576).toFixed(1) }}MB
     </div>
@@ -45,5 +46,6 @@ async function remove() {
     <p class="muted" style="font-size: 12px">
       WebM 녹화는 브라우저 특성상 탐색 바 길이가 늦게 표시될 수 있습니다.
     </p>
+  </div>
   </div>
 </template>

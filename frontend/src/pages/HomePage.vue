@@ -1,48 +1,66 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { api, fmtDate } from '../lib/api'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { api } from '../lib/api'
+import { auth } from '../lib/auth'
+import BroadcastCard from '../components/BroadcastCard.vue'
 
-const filter = ref('')
+const route = useRoute()
 const items = ref([])
 const error = ref('')
+const loaded = ref(false)
 let timer
 
 async function load() {
   try {
-    items.value = await api(`/broadcasts${filter.value ? `?status=${filter.value}` : ''}`)
+    items.value = await api('/broadcasts')
     error.value = ''
   } catch (e) {
     error.value = e.message
   }
+  loaded.value = true
 }
 
-watch(filter, load)
+const q = computed(() => (route.query.q || '').toString().toLowerCase())
+const match = (b) =>
+  !q.value || [b.title, b.ownerNickname, b.category, b.description].some((v) => (v || '').toLowerCase().includes(q.value))
+const filtered = computed(() => items.value.filter(match))
+const liveNow = computed(() => filtered.value.filter((b) => b.status === 'LIVE').sort((a, b) => b.viewerCount - a.viewerCount))
+const upcoming = computed(() => filtered.value.filter((b) => b.status === 'READY'))
+const ended = computed(() => filtered.value.filter((b) => b.status === 'ENDED').sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt)))
+
+watch(q, () => window.scrollTo(0, 0))
 onMounted(() => {
   load()
   timer = setInterval(load, 10000)
 })
 onUnmounted(() => clearInterval(timer))
-
-const label = { LIVE: 'LIVE', READY: '방송 전', ENDED: '종료' }
 </script>
 
 <template>
-  <div class="tabs">
-    <button :class="{ on: filter === '' }" @click="filter = ''">전체</button>
-    <button :class="{ on: filter === 'LIVE' }" @click="filter = 'LIVE'">방송 중</button>
-    <button :class="{ on: filter === 'ENDED' }" @click="filter = 'ENDED'">종료</button>
-  </div>
-  <p v-if="error" class="error">{{ error }}</p>
-  <p v-else-if="!items.length" class="muted">방송이 없습니다.</p>
-  <div class="grid">
-    <RouterLink v-for="b in items" :key="b.id" :to="`/broadcasts/${b.id}`">
-      <div class="thumb">
-        <span class="badge" :class="b.status">{{ label[b.status] }}</span>
-        <span>{{ b.sourceType === 'CAMERA' ? '📱 모바일 카메라' : b.sourceType === 'SCREEN' ? '🖥️ PC 화면' : '' }}</span>
+  <div class="page">
+    <p v-if="error" class="error">{{ error }}</p>
+    <div v-if="q" class="section-head"><h2>‘{{ route.query.q }}’ 검색 결과</h2><span class="count">{{ filtered.length }}개</span></div>
+
+    <section class="section">
+      <div class="section-head"><h2><span class="live-dot" /> 지금 라이브</h2><span class="count">{{ liveNow.length }}</span></div>
+      <div v-if="liveNow.length" class="grid">
+        <BroadcastCard v-for="b in liveNow" :key="b.id" :b="b" />
       </div>
-      <h2 style="margin-top: 10px">{{ b.title }}</h2>
-      <div class="muted">{{ b.ownerNickname }} · {{ b.category || '일반' }}</div>
-      <div class="muted">{{ b.status === 'LIVE' ? `시작 ${fmtDate(b.startedAt)}` : `등록 ${fmtDate(b.createdAt)}` }}</div>
-    </RouterLink>
+      <div v-else-if="loaded" class="empty">
+        지금 방송 중인 채널이 없어요.
+        <div v-if="auth.token" style="margin-top: 12px"><RouterLink to="/broadcasts/new" class="btn primary">● 첫 방송 시작하기</RouterLink></div>
+      </div>
+    </section>
+
+    <section v-if="upcoming.length" class="section">
+      <div class="section-head"><h2>방송 예정</h2><span class="count">{{ upcoming.length }}</span></div>
+      <div class="grid"><BroadcastCard v-for="b in upcoming" :key="b.id" :b="b" /></div>
+    </section>
+
+    <section v-if="ended.length" class="section">
+      <div class="section-head"><h2>지난 방송</h2><span class="count">{{ ended.length }}</span></div>
+      <div class="grid"><BroadcastCard v-for="b in ended" :key="b.id" :b="b" /></div>
+    </section>
   </div>
 </template>

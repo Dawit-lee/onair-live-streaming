@@ -5,7 +5,9 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +88,38 @@ public class LiveKitService {
             // 방이 이미 없으면(송출자가 먼저 나감) 404가 온다. 종료 처리 자체는 계속 진행한다.
             log.warn("LiveKit DeleteRoom failed for {}: {}", room, e.getMessage());
         }
+    }
+
+    private record CachedCount(int count, long at) {}
+
+    private final Map<String, CachedCount> viewerCounts = new ConcurrentHashMap<>();
+
+    /** 방의 시청자 수(identity가 viewer-로 시작). 목록 폴링마다 LiveKit을 두드리지 않도록 5초 캐시. 실패하면 0. */
+    public int viewerCount(String room) {
+        CachedCount cached = viewerCounts.get(room);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.at() < 5_000) return cached.count();
+        int count = 0;
+        try {
+            Map<?, ?> res =
+                    rest.post()
+                            .uri("/twirp/livekit.RoomService/ListParticipants")
+                            .header("Authorization", "Bearer " + adminToken(room))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(Map.of("room", room))
+                            .retrieve()
+                            .body(Map.class);
+            if (res != null && res.get("participants") instanceof List<?> list) {
+                count = (int) list.stream()
+                        .filter(p -> p instanceof Map<?, ?> m
+                                && String.valueOf(m.get("identity")).startsWith("viewer-"))
+                        .count();
+            }
+        } catch (RestClientException e) {
+            // 방이 아직 없거나 LiveKit이 응답하지 않으면 0으로 표시한다.
+        }
+        viewerCounts.put(room, new CachedCount(count, now));
+        return count;
     }
 
     /**

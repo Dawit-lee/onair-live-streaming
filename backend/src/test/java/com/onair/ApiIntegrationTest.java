@@ -180,6 +180,33 @@ class ApiIntegrationTest {
                 .andExpect(content().string("def"));
     }
 
+    @Test
+    void thumbnail_ownerOnlyJpegAndPublicRead() throws Exception {
+        long id = createBroadcast(owner);
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02};
+        mvc.perform(get("/api/broadcasts/" + id + "/thumbnail")).andExpect(status().isNotFound());
+        upload(id, null, jpeg).andExpect(status().isUnauthorized());
+        upload(id, other, jpeg).andExpect(status().isForbidden());
+        upload(id, owner, "not-a-jpeg".getBytes()).andExpect(status().isBadRequest());
+        upload(id, owner, jpeg).andExpect(status().isNoContent());
+        mvc.perform(get("/api/broadcasts/" + id + "/thumbnail"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_JPEG))
+                .andExpect(content().bytes(jpeg));
+        // LiveKit에 닿지 않아도 목록은 시청자 0명으로 정상 응답한다.
+        post("/api/broadcasts/" + id + "/start", owner, "{\"sourceType\":\"SCREEN\"}").andExpect(status().isOk());
+        mvc.perform(get("/api/broadcasts/" + id)).andExpect(jsonPath("$.viewerCount").value(0));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions upload(long id, String token, byte[] body) throws Exception {
+        var req = org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/broadcasts/" + id + "/thumbnail")
+                .contentType(MediaType.IMAGE_JPEG)
+                .content(body);
+        if (token != null) req.header("Authorization", "Bearer " + token);
+        return mvc.perform(req);
+    }
+
     private org.springframework.test.web.servlet.ResultActions chunk(Number recId, int seq, String data) throws Exception {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                 .post("/api/recordings/" + recId + "/chunks?seq=" + seq)
