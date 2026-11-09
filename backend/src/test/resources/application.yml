@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:onair;MODE=MariaDB;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+app:
+  jwt:
+    secret: test-secret-key-that-is-at-least-32-bytes-long
+    ttl-seconds: 3600
+  demo:
+    enabled: true
+  livekit:
+    public-url: ws://localhost:7880
+    api-url: http://localhost:1
+    api-key: testkey
+    api-secret: test-livekit-secret-that-is-32-bytes-or-more
+    token-ttl-seconds: 600
+  toss:
+    client-key: test_ck_dummy
+    secret-key: test_sk_dummy
+  recording:
+    dir: ./build/test-recordings

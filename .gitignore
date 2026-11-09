@@ -1,0 +1,9 @@
+.env
+node_modules/
+dist/
+build/
+.gradle/
+data/
+*.log
+.DS_Store
+.idea/

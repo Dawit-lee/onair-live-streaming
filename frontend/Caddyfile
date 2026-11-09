@@ -1,0 +1,21 @@
+# DOMAIN=example.com 이면 Let's Encrypt 인증서를 자동 발급한다. 로컬은 DOMAIN=localhost
+{$DOMAIN:localhost} {
+	encode gzip
+
+	# 백엔드 API
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# LiveKit 시그널링(WebSocket). 미디어는 7881/tcp, 7882/udp로 직접 연결된다.
+	handle /rtc* {
+		reverse_proxy livekit:7880
+	}
+
+	# SPA
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
