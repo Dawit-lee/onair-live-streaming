@@ -30,5 +30,5 @@ export async function api(path, { method = 'GET', body, raw, headers = {} } = {}
   return text ? JSON.parse(text) : null
 }
 
-export const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('ko-KR') : '-')
+export const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-')
 export const fmtWon = (n) => `${Number(n || 0).toLocaleString('ko-KR')}원`

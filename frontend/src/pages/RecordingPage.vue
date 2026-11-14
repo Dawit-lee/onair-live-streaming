@@ -17,6 +17,17 @@ onMounted(async () => {
   }
 })
 
+/**
+ * 조각을 이어 붙인 WebM은 헤더에 길이가 없어 duration이 Infinity로 나온다.
+ * 끝으로 한 번 탐색하면 브라우저가 실제 길이를 계산하므로, 그 뒤 처음으로 되돌린다.
+ */
+function fixDuration(e) {
+  const v = e.target
+  if (v.duration !== Infinity) return
+  v.addEventListener('durationchange', () => (v.currentTime = 0), { once: true })
+  v.currentTime = 1e101
+}
+
 async function remove() {
   if (!confirm('녹화 영상을 삭제할까요?')) return
   try {
@@ -33,7 +44,7 @@ async function remove() {
   <p v-if="error" class="error">{{ error }}</p>
   <div v-if="r">
     <div class="vod-player">
-      <video :src="r.videoUrl" controls playsinline autoplay />
+      <video :src="r.videoUrl" controls playsinline autoplay @loadedmetadata="fixDuration" />
     </div>
     <h1 style="margin-top: 16px">{{ r.title }}</h1>
     <div class="muted">
@@ -43,9 +54,6 @@ async function remove() {
       <RouterLink :to="`/broadcasts/${r.broadcastId}`" class="btn">원본 방송 페이지</RouterLink>
       <button v-if="auth.user?.id === r.ownerId" class="danger" @click="remove">삭제</button>
     </div>
-    <p class="muted" style="font-size: 12px">
-      WebM 녹화는 브라우저 특성상 탐색 바 길이가 늦게 표시될 수 있습니다.
-    </p>
   </div>
   </div>
 </template>

@@ -4,6 +4,8 @@ import { api, fmtWon } from '../lib/api'
 import { auth } from '../lib/auth'
 import { nickColor } from '../lib/ui'
 import DonationModal from './DonationModal.vue'
+import { toast } from 'vue-sonner'
+import { Gift, Coins, Mic } from '@lucide/vue'
 
 const props = defineProps({ broadcast: { type: Object, required: true } })
 const emit = defineEmits(['donation'])
@@ -12,7 +14,6 @@ const comments = ref([])
 const donations = ref({ total: 0, count: 0, items: [] })
 const config = ref({ enabled: false })
 const text = ref('')
-const error = ref('')
 const editingId = ref(null)
 const editText = ref('')
 const listEl = ref(null)
@@ -71,14 +72,13 @@ async function loadDonations() {
 
 async function send() {
   if (!text.value.trim()) return
-  error.value = ''
   try {
     await api(`/broadcasts/${props.broadcast.id}/comments`, { method: 'POST', body: { content: text.value } })
     text.value = ''
     await loadComments()
     scrollDown(true)
   } catch (e) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 
@@ -88,7 +88,7 @@ async function saveEdit(c) {
     editingId.value = null
     await loadComments()
   } catch (e) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 
@@ -98,12 +98,12 @@ async function remove(c) {
     await api(`/comments/${c.id}`, { method: 'DELETE' })
     await loadComments()
   } catch (e) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 
 function openDonate() {
-  if (donateBlocked.value) return (error.value = donateBlocked.value)
+  if (donateBlocked.value) return toast.info(donateBlocked.value)
   showDonate.value = true
 }
 
@@ -122,13 +122,13 @@ onUnmounted(() => timers.forEach(clearInterval))
   <section class="chat" aria-label="채팅">
     <div class="chat-head">
       <span>채팅</span>
-      <span class="total" title="누적 후원">💸 {{ fmtWon(donations.total) }} · {{ donations.count }}건</span>
+      <span class="total" title="누적 후원"><Coins :size="13" /> {{ fmtWon(donations.total) }} · {{ donations.count }}건</span>
     </div>
     <div ref="listEl" class="chat-list">
       <div class="chat-system">채팅방에 오신 것을 환영합니다. 서로 배려하는 채팅 문화를 만들어 주세요.</div>
       <template v-for="m in feed" :key="m.key">
         <div v-if="m.kind === 'donation'" class="chat-donation">
-          <div><b :style="{ color: nickColor(m.id) }">{{ m.donorNickname }}</b>님이 <span class="amt">{{ fmtWon(m.amount) }}</span> 후원했어요 💸</div>
+          <div><b :style="{ color: nickColor(m.id) }">{{ m.donorNickname }}</b>님이 <span class="amt">{{ fmtWon(m.amount) }}</span> 후원했어요</div>
           <div v-if="m.message" class="msg">{{ m.message }}</div>
         </div>
         <div v-else class="chat-msg">
@@ -138,7 +138,7 @@ onUnmounted(() => timers.forEach(clearInterval))
             <button type="button" style="height: 32px" @click="editingId = null">취소</button>
           </form>
           <template v-else>
-            <span class="nick" :style="{ color: nickColor(m.authorId) }">{{ m.authorNickname }}<template v-if="m.authorId === broadcast.ownerId"> 🎙️</template></span>{{ m.content }}<span v-if="m.updatedAt !== m.createdAt" class="edited">(수정됨)</span>
+            <span class="nick" :style="{ color: nickColor(m.authorId) }">{{ m.authorNickname }}<Mic v-if="m.authorId === broadcast.ownerId" :size="12" class="owner-mark" aria-label="방송자" /></span>{{ m.content }}<span v-if="m.updatedAt !== m.createdAt" class="edited">(수정됨)</span>
             <span v-if="auth.user?.id === m.authorId" class="actions">
               <button @click="editingId = m.id; editText = m.content">수정</button>
               <button @click="remove(m)">삭제</button>
@@ -148,9 +148,8 @@ onUnmounted(() => timers.forEach(clearInterval))
       </template>
     </div>
     <div class="chat-input">
-      <p v-if="error" class="error" style="margin: 0 0 8px">{{ error }}</p>
       <form v-if="auth.token" @submit.prevent="send">
-        <button type="button" class="ghost" :title="donateBlocked || '후원하기'" :disabled="!!donateBlocked && isOwner" @click="openDonate">💸 후원</button>
+        <button type="button" class="ghost" :title="donateBlocked || '후원하기'" :disabled="!!donateBlocked && isOwner" @click="openDonate"><Gift :size="16" /> 후원</button>
         <input v-model="text" maxlength="500" placeholder="채팅을 입력해 주세요" aria-label="채팅 입력" />
         <button class="primary">전송</button>
       </form>

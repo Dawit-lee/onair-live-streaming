@@ -16,6 +16,8 @@ import { auth } from '../lib/auth'
 import { canRecord, startRecording } from '../lib/recorder'
 import { fmtCount, fmtUptime, useNow } from '../lib/ui'
 import ChatPanel from '../components/ChatPanel.vue'
+import { toast } from 'vue-sonner'
+import { Users, Mic, MicOff, Monitor, Smartphone, Radio, Square, Volume2 } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,6 +151,7 @@ async function start() {
     if (tracks.screenAudio) await lp.publishTrack(tracks.screenAudio, { source: Track.Source.ScreenShareAudio })
     await lp.publishTrack(tracks.mic, { source: Track.Source.Microphone })
     live.value = true
+    toast.success('방송을 시작했어요')
     await load()
     // 시청자 수 갱신과 목록용 라이브 썸네일(30초마다)
     pollTimer = setInterval(load, 10000)
@@ -161,11 +164,11 @@ async function start() {
         recorder = await startRecording(id, tracks.video.mediaStreamTrack, audio)
         recording.value = true
       } catch (e) {
-        info.value = `녹화를 시작하지 못했습니다 (방송은 계속됩니다): ${e.message}`
+        toast.warning(`녹화를 시작하지 못했습니다 (방송은 계속됩니다): ${e.message}`)
       }
     }
   } catch (e) {
-    error.value = `방송 시작 실패: ${e.message}`
+    toast.error(`방송 시작 실패: ${e.message}`)
     // 서버에서는 LIVE가 됐는데 연결에 실패했다면 상태를 되돌린다.
     if (room) await api(`/broadcasts/${id}/end`, { method: 'POST' }).catch(() => {})
     cleanupLive()
@@ -184,15 +187,16 @@ async function end() {
       try {
         await recorder.stop()
       } catch (e) {
-        error.value = `녹화 저장 실패: ${e.message}`
+        toast.error(`녹화 저장 실패: ${e.message}`)
       }
     }
     await api(`/broadcasts/${id}/end`, { method: 'POST' })
     cleanupLive()
     stopTracks()
+    toast('방송을 종료했어요')
     router.push(`/broadcasts/${id}`)
   } catch (e) {
-    error.value = `종료 실패: ${e.message}`
+    toast.error(`종료 실패: ${e.message}`)
   } finally {
     busy.value = false
   }
@@ -303,7 +307,7 @@ onUnmounted(() => {
         <div class="hud">
           <span v-if="live" class="badge-live">LIVE</span>
           <span v-else class="badge">미리보기</span>
-          <span v-if="live" class="badge">👤 {{ fmtCount(b.viewerCount) }}</span>
+          <span v-if="live" class="badge"><Users :size="12" /> {{ fmtCount(b.viewerCount) }}</span>
           <span v-if="live" class="badge">{{ fmtUptime(b.startedAt, now) }}</span>
           <span v-if="recording" class="badge">● REC</span>
         </div>
@@ -317,7 +321,7 @@ onUnmounted(() => {
       <div class="studio-panel">
         <div class="row" style="justify-content: space-between">
           <div>
-            <div class="muted">🎙️ 방송 스튜디오</div>
+            <div class="muted ico"><Radio :size="14" /> 방송 스튜디오</div>
             <h1>{{ b.title }}</h1>
           </div>
           <RouterLink :to="`/broadcasts/${b.id}/edit`" class="btn ghost">방송 정보 수정</RouterLink>
@@ -326,16 +330,16 @@ onUnmounted(() => {
         <div v-if="live" class="studio-stats">
           <div><span class="muted">시청자</span><b>{{ fmtCount(b.viewerCount) }}명</b></div>
           <div><span class="muted">방송 시간</span><b>{{ fmtUptime(b.startedAt, now) }}</b></div>
-          <div><span class="muted">송출 소스</span><b>{{ source === 'SCREEN' ? '🖥️ 화면' : '📱 카메라' }}</b></div>
+          <div><span class="muted">송출 소스</span><b class="ico"><Monitor v-if="source === 'SCREEN'" :size="18" /><Smartphone v-else :size="18" />{{ source === 'SCREEN' ? '화면' : '카메라' }}</b></div>
         </div>
 
         <div v-else class="source-pick" style="margin-top: 16px">
           <button :class="{ on: source === 'SCREEN' }" :disabled="!canScreen" @click="source = 'SCREEN'; stopTracks()">
-            <span class="t">🖥️ PC 화면 공유</span>
+            <span class="t ico"><Monitor :size="18" /> PC 화면 공유</span>
             <span class="d">{{ canScreen ? '화면 + 탭/시스템 소리 + 마이크' : '이 기기에서는 지원하지 않아요' }}</span>
           </button>
           <button :class="{ on: source === 'CAMERA' }" @click="source = 'CAMERA'; stopTracks()">
-            <span class="t">📱 카메라</span>
+            <span class="t ico"><Smartphone :size="18" /> 카메라</span>
             <span class="d">휴대폰/웹캠 카메라 + 마이크</span>
           </button>
         </div>
@@ -345,10 +349,10 @@ onUnmounted(() => {
         </select>
 
         <div v-if="prepared" style="margin-top: 16px">
-          <div class="muted">🎙️ 마이크 {{ micMuted ? '(음소거)' : '' }}</div>
+          <div class="muted ico"><Mic :size="14" /> 마이크 {{ micMuted ? '(음소거)' : '' }}</div>
           <div class="meter"><i :style="{ width: levels.mic + '%' }" /></div>
           <template v-if="source === 'SCREEN'">
-            <div class="muted" style="margin-top: 8px">🔊 탭/시스템 소리 {{ hasScreenAudio ? '' : '(없음)' }}</div>
+            <div class="muted ico" style="margin-top: 8px"><Volume2 :size="14" /> 탭/시스템 소리 {{ hasScreenAudio ? '' : '(없음)' }}</div>
             <div class="meter"><i :style="{ width: levels.screen + '%' }" /></div>
           </template>
         </div>
@@ -360,11 +364,11 @@ onUnmounted(() => {
         <div class="row" style="margin-top: 18px">
           <template v-if="!live">
             <button class="lg" :disabled="busy" @click="prepare">{{ prepared ? '소스 다시 선택' : '미리보기 켜기' }}</button>
-            <button class="primary lg" :disabled="!prepared || busy || b.status === 'LIVE'" @click="start">● 방송 시작</button>
+            <button class="primary lg" :disabled="!prepared || busy || b.status === 'LIVE'" @click="start"><Radio :size="18" /> 방송 시작</button>
           </template>
           <template v-else>
-            <button class="lg" @click="toggleMic">{{ micMuted ? '🎙️ 마이크 켜기' : '🔇 마이크 끄기' }}</button>
-            <button class="danger lg" :disabled="busy" @click="end">■ 방송 종료</button>
+            <button class="lg" @click="toggleMic"><Mic v-if="micMuted" :size="18" /><MicOff v-else :size="18" />{{ micMuted ? '마이크 켜기' : '마이크 끄기' }}</button>
+            <button class="danger lg" :disabled="busy" @click="end"><Square :size="16" /> 방송 종료</button>
           </template>
           <RouterLink :to="`/broadcasts/${b.id}`" class="btn ghost lg">시청 화면 보기</RouterLink>
         </div>

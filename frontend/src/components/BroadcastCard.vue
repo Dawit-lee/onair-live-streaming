@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { avatarStyle, initial, fmtCount, timeAgo, thumbUrl } from '../lib/ui'
+import { Monitor, Smartphone } from '@lucide/vue'
 
 const props = defineProps({ b: { type: Object, required: true } })
 const noThumb = ref(false)
@@ -14,7 +15,8 @@ const noThumb = ref(false)
       <div class="tl">
         <span v-if="b.status === 'LIVE'" class="badge-live">LIVE</span>
         <span v-else class="badge">{{ b.status === 'READY' ? '방송 예정' : '방송 종료' }}</span>
-        <span v-if="b.sourceType" class="badge">{{ b.sourceType === 'CAMERA' ? '📱 모바일' : '🖥️ PC' }}</span>
+        <span v-if="b.sourceType === 'CAMERA'" class="badge"><Smartphone :size="12" /> 모바일</span>
+        <span v-else-if="b.sourceType" class="badge"><Monitor :size="12" /> PC</span>
       </div>
       <div v-if="b.status === 'LIVE'" class="bl"><span class="badge">{{ fmtCount(b.viewerCount) }}명 시청</span></div>
       <div v-else-if="b.endedAt" class="br"><span class="badge">{{ timeAgo(b.endedAt) }}</span></div>

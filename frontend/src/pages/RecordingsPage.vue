@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../lib/api'
 import { avatarStyle, initial, timeAgo } from '../lib/ui'
+import { Film } from '@lucide/vue'
 
 const items = ref([])
 const error = ref('')
@@ -24,7 +25,7 @@ onMounted(async () => {
 
 <template>
   <div class="page">
-    <div class="section-head"><h2>🎞️ 다시보기</h2><span class="count">{{ items.length }}</span></div>
+    <div class="section-head"><h2 class="ico"><Film :size="22" /> 다시보기</h2><span class="count">{{ items.length }}</span></div>
     <p v-if="error" class="error">{{ error }}</p>
     <div v-else-if="loaded && !items.length" class="empty">저장된 녹화 영상이 없어요. 스튜디오에서 「녹화」를 켜고 방송하면 여기에 쌓여요.</div>
     <div class="grid">

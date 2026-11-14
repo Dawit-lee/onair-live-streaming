@@ -22,7 +22,8 @@ PC 화면 공유와 휴대폰 카메라로 라이브 방송을 송출하고, 다
 7. [API](#api)
 8. [선택 기능 구현 방식](#선택-기능-구현-방식)
 9. [테스트](#테스트)
-10. [출처](#출처)
+10. [알려진 한계](#알려진-한계)
+11. [출처](#출처)
 
 ---
 
@@ -203,6 +204,16 @@ READY ──start(소유자)──▶ LIVE ──end(소유자) / 송출자 연�
 - **비정상 종료**: 탭을 닫거나 네트워크가 끊겨 송출자가 방을 나가면, LiveKit 웹훅(`participant_left`, 서명 검증)으로 자동 `ENDED` 처리합니다.
 - **시청 토큰**은 `LIVE`일 때만 발급됩니다. 종료된 방송에는 접속할 수 없습니다.
 
+### 설계 결정
+| 결정 | 이유 | 대안과 비교 |
+|---|---|---|
+| **LiveKit(WebRTC SFU)로 송출과 시청** | 브라우저만으로 송출할 수 있고 지연이 1초 안쪽입니다. 송출자는 한 번만 올리고 서버가 시청자에게 나눠 줘서 시청자가 늘어도 송출자 회선 부담이 같습니다 | P2P 메시(시청자 수만큼 송출자가 업로드), RTMP + HLS(OBS 같은 별도 송출 프로그램이 필요하고 지연이 수 초) |
+| **방송마다 새 LiveKit 방** | 이전 송출의 늦은 웹훅이 다시 시작한 방송을 끝내지 않게 합니다 | 방송 id를 방 이름으로 고정 |
+| **권한 검증은 서버 서비스 계층에서** | 프론트 버튼 숨김은 우회할 수 있어서, 소유자/작성자 확인을 API마다 서버에서 합니다 | 프론트에서만 확인 |
+| **후원 금액은 서버에 저장한 주문 금액만 신뢰** | 클라이언트가 보낸 금액은 위변조될 수 있어서 주문 생성 때 저장한 금액, 토스 승인 응답과 대조합니다. 비관적 잠금으로 중복 적립을 막습니다 | 결제 성공 리다이렉트만 믿고 적립 |
+| **녹화는 송출자 브라우저의 MediaRecorder** | 서버 한 대(t3.small)에 녹화용 컨테이너를 더 띄우지 않고 구현할 수 있습니다 | LiveKit Egress(서버 측 녹화, CPU와 메모리를 많이 사용) |
+| **Spring Boot + JWT** | 직접 참여한 팀 프로젝트의 보안 설정과 LiveKit 토큰 코드를 재사용할 수 있습니다([출처](#출처)) | - |
+
 ### 디렉터리
 ```
 backend/   Spring Boot API (auth, broadcast, comment, donation, recording, livekit)
@@ -290,6 +301,17 @@ cd backend && ./gradlew test
   - 녹화: 조각 재전송 무시, 순서 건너뜀 409, 종료 시 확정, Range 재생
 - `LiveKitWebhookVerifyTest`: 웹훅 서명 검증(본문 변조, 다른 시크릿, 다른 키 거부)
 
+테스트는 틀리면 피해가 큰 곳(권한, 방송 상태 전이, 결제 금액과 중복 적립, 웹훅 위조, 녹화 파일 순서)에 집중했습니다. 화면 구성과 단순 조회는 수동으로 확인합니다.
+
+---
+
+## 알려진 한계
+- **송출은 자동 테스트 범위 밖**: 화면 공유, 탭/시스템 소리, 카메라 송출은 브라우저 권한 창과 실제 장치가 필요해 자동 테스트로 검증하지 않습니다. [지원 환경](#지원-환경)의 브라우저에서 수동으로 확인해야 합니다.
+- **결제는 테스트 모드만**: 토스페이먼츠 테스트 키로만 동작하며 실제 결제, 정산, 환불은 구현하지 않았습니다.
+- **녹화는 송출자 브라우저에서**: 송출자 회선으로 업로드 대역이 추가로 들고, 송출 탭이 비정상 종료되면 마지막 몇 초가 빠질 수 있습니다. 서버 측 녹화가 필요하면 LiveKit Egress로 바꿀 수 있습니다.
+- **토큰을 localStorage에 저장**: 구현이 단순한 대신 XSS에 노출되면 토큰이 탈취될 수 있습니다. 운영 환경이라면 httpOnly 쿠키와 CSRF 방어로 바꿔야 합니다. 토큰은 12시간 뒤 만료되며 갱신(refresh) 토큰은 없습니다.
+- **단일 서버**: API, LiveKit, DB가 EC2 한 대(t3.small)에서 동작합니다. 동시 시청자가 많아지면 LiveKit을 별도 서버나 LiveKit Cloud로 분리해야 합니다.
+
 ---
 
 ## 출처
@@ -298,4 +320,7 @@ cd backend && ./gradlew test
 - [livekit-client](https://github.com/livekit/client-sdk-js) (Apache-2.0): 브라우저 송출 / 시청 SDK
 - [토스페이먼츠 결제 SDK v2](https://docs.tosspayments.com/): 테스트 모드 결제
 - [Caddy](https://github.com/caddyserver/caddy) (Apache-2.0): HTTPS 리버스 프록시
+- [VueUse](https://github.com/vueuse/vueuse) (`@vueuse/core`, MIT): 시청 화면 전체화면(`useFullscreen`), 극장 모드/채팅 접기 상태 저장(`useStorage`)
+- [Lucide](https://github.com/lucide-icons/lucide) (`@lucide/vue`, ISC): 헤더, 사이드바, 버튼 아이콘
+- [vue-sonner](https://github.com/xiaoluoboding/vue-sonner) (MIT): 후원 완료, 오류, 방송 시작/종료 토스트 알림
 - 개발 과정에서 AI 개발 도구(Claude Code)를 활용했습니다.

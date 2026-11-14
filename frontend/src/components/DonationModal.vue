@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { api, fmtWon } from '../lib/api'
 import { avatarStyle, initial } from '../lib/ui'
+import { Gift, X } from '@lucide/vue'
 
 const props = defineProps({ broadcast: { type: Object, required: true }, clientKey: String })
 const emit = defineEmits(['close'])
@@ -54,8 +55,8 @@ async function donate() {
   <div class="modal-back" @click.self="emit('close')">
     <div class="modal" role="dialog" aria-label="후원하기">
       <div class="modal-head">
-        <h2>💸 후원하기</h2>
-        <button class="icon-btn ghost" aria-label="닫기" @click="emit('close')">✕</button>
+        <h2 class="ico"><Gift :size="20" /> 후원하기</h2>
+        <button class="icon-btn ghost" aria-label="닫기" @click="emit('close')"><X :size="18" /></button>
       </div>
       <div class="row" style="margin-bottom: 14px">
         <div class="avatar" :style="avatarStyle(broadcast.ownerId)">{{ initial(broadcast.ownerNickname) }}</div>

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api, fmtWon } from '../lib/api'
+import { toast } from 'vue-sonner'
 
 const route = useRoute()
 const q = route.query
@@ -18,9 +19,11 @@ onMounted(async () => {
       body: { paymentKey: q.paymentKey, orderId: q.orderId, amount: Number(q.amount) },
     })
     state.value = 'done'
+    toast.success(`${fmtWon(q.amount)} 후원 완료!`)
   } catch (e) {
     state.value = 'fail'
     message.value = e.message
+    toast.error(`후원 실패: ${e.message}`)
   }
 })
 </script>
@@ -29,7 +32,7 @@ onMounted(async () => {
   <div class="card narrow" style="text-align: center">
     <template v-if="state === 'loading'"><h1>결제 승인 확인 중…</h1></template>
     <template v-else-if="state === 'done'">
-      <h1>💚 {{ fmtWon(q.amount) }} 후원 완료!</h1>
+      <h1>{{ fmtWon(q.amount) }} 후원 완료!</h1>
     </template>
     <template v-else>
       <h1>후원 실패</h1>
