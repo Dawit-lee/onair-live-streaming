@@ -107,6 +107,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST $BASE/broadcasts/1/start -H "Au
 - 데모 계정은 서버 시작 시 자동으로 생성되고, 버튼 하나로 바로 로그인됩니다(`POST /api/auth/demo-login/{0|1}`).
 - 데모 계정의 비밀번호 로그인이 필요하면 서버 환경변수 `DEMO_PASSWORD`로 정합니다. 설정하지 않으면 임의 값이 쓰여서 버튼으로만 로그인할 수 있습니다.
 - 회원가입으로 새 계정을 만들어도 됩니다.
+- 배포 서버의 방송, 채팅, 다시보기 일부는 `scripts/seed-demo.sh`로 넣은 데모 데이터입니다(공개 API만 사용, 후원 기록은 없음).
 
 ---
 
