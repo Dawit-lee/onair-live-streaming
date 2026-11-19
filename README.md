@@ -6,6 +6,7 @@ PC 화면 공유와 휴대폰 카메라로 라이브 방송을 송출하고, 다
 | 항목 | 내용 |
 |---|---|
 | **서비스 주소** | **https://32-236-149-38.sslip.io** (AWS EC2 시드니 리전, t3.small) |
+| **시연 영상** | **[docs/demo.mp4](https://github.com/Dawit-lee/onair-live-streaming/raw/main/docs/demo.mp4)** (54초): PC 화면 공유 송출 → 비로그인 시청 → 극장 모드·채팅 → 채팅 → 방송 종료 → 후원 |
 | **테스트 계정** | 로그인 화면의 **「데모 방송자」/「데모 시청자」 버튼**을 누르면 비밀번호 없이 바로 로그인됩니다 (아래 [테스트 계정](#테스트-계정) 참고) |
 | **요구사항별 근거** | [docs/EVIDENCE.md](docs/EVIDENCE.md): 과제 체크리스트 항목마다 코드 위치, 테스트, 확인 방법 |
 | 기술 스택 | Spring Boot 4 (Java 25), Spring Security JWT, JPA + Flyway, MariaDB · Vue 3 + Vite · LiveKit (WebRTC SFU) · Caddy (HTTPS) · Docker Compose |
