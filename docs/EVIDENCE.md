@@ -1,6 +1,6 @@
 # 요구사항별 근거
 
-- 서비스: https://52-62-28-94.sslip.io (테스트 계정: 로그인 화면 「데모 방송자」/「데모 시청자」 버튼)
+- 서비스: https://32-236-149-38.sslip.io (테스트 계정: 로그인 화면 「데모 방송자」/「데모 시청자」 버튼)
 - 저장소: https://github.com/Dawit-lee/onair-live-streaming
 - 코드 링크는 커밋 `7ecf8b9`에 고정되어 있어 이후 코드가 바뀌어도 줄 번호가 어긋나지 않습니다.
 - 자동 테스트: `cd backend && ./gradlew test` (8개, [ApiIntegrationTest.java](https://github.com/Dawit-lee/onair-live-streaming/blob/7ecf8b9/backend/src/test/java/com/onair/ApiIntegrationTest.java), [LiveKitWebhookVerifyTest.java](https://github.com/Dawit-lee/onair-live-streaming/blob/7ecf8b9/backend/src/test/java/com/onair/LiveKitWebhookVerifyTest.java))
